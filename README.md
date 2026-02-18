@@ -4,7 +4,8 @@ A minimal production-minded personal expense tracker with:
 - JWT auth (`signup`, `login`)
 - Idempotent expense creation for retry safety
 - Expense listing with category filter and date sort
-- Total for currently visible expenses in the UI
+- Delete expense support
+- Total for currently visible expenses in the UI and per-category summary
 
 ## Tech Stack
 - Backend: Node.js, Express, MongoDB, Mongoose, JWT
@@ -27,6 +28,8 @@ MongoDB with Mongoose was chosen for speed of implementation and schema validati
   - Optional query params:
   - `category=<string>`
   - `sort=date_desc` (default), also supports `date_asc`
+- `DELETE /api/expenses/:id`
+  - Deletes an expense that belongs to the authenticated user.
 
 Expense model fields:
 - `id` (`_id`)
@@ -51,6 +54,7 @@ Implemented:
 - Basic validation (frontend + backend)
 - Default category options with custom category support
 - Automated tests for expense controller behaviors
+- Improved UX: centered auth layout, highlighted total card, reset filters, loading skeletons, better empty state
 
 ## Reliability Behaviors
 - Frontend keeps pending expense submission in `localStorage` and retries safely.
@@ -97,7 +101,7 @@ npm run dev
 - Money is stored as `Number` with 2-decimal normalization in controller for simplicity. In a stricter financial system, storing minor units (paise/cents as integers) would be safer.
 - Auth + user-scoped expenses were included to align with real-world usage.
 - Tests are focused on controller-level behavior using Node's built-in `node:test` to keep setup light.
-- No edit/delete expense endpoints were added because they were out of assignment scope.
+- Delete is implemented; update/edit endpoints were intentionally not added to keep scope focused.
 - Deploy links are not included in this repo yet; add them after deployment.
 
 ## Automated Tests
@@ -111,3 +115,4 @@ Current tests cover:
 - validation for invalid amount
 - idempotent create behavior (same key returns existing row)
 - list filter/sort behavior and total calculation
+- delete success and delete-not-found behavior
