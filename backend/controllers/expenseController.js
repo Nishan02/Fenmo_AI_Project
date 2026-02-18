@@ -109,3 +109,26 @@ exports.createExpense = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Server Error' });
   }
 };
+
+// @desc    Delete an expense by id
+// @route   DELETE /api/expenses/:id
+exports.deleteExpense = async (req, res) => {
+  try {
+    const deletedExpense = await Expense.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!deletedExpense) {
+      return res.status(404).json({ success: false, error: 'Expense not found' });
+    }
+
+    return res.status(200).json({ success: true, data: deletedExpense });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(404).json({ success: false, error: 'Expense not found' });
+    }
+
+    return res.status(500).json({ success: false, error: 'Server Error' });
+  }
+};

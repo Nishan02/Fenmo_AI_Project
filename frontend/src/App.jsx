@@ -5,6 +5,17 @@ import './App.css';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 const AUTH_STORAGE_KEY = 'expense_tracker_auth';
 const PENDING_EXPENSE_KEY = 'expense_tracker_pending_expense';
+const DEFAULT_EXPENSE_CATEGORIES = [
+  'Food',
+  'Transport',
+  'Rent',
+  'Utilities',
+  'Entertainment',
+  'Shopping',
+  'Health',
+  'Education',
+  'Other',
+];
 
 const getTodayDateString = () => {
   const now = new Date();
@@ -115,10 +126,12 @@ function App() {
 
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
-    category: '',
+    category: DEFAULT_EXPENSE_CATEGORIES[0],
     description: '',
     date: getTodayDateString(),
   });
+  const [categoryInputType, setCategoryInputType] = useState('preset');
+  const [customCategory, setCustomCategory] = useState('');
 
   const [expenses, setExpenses] = useState([]);
   const [expensesLoading, setExpensesLoading] = useState(false);
@@ -128,6 +141,7 @@ function App() {
   const [sortOrder, setSortOrder] = useState('date_desc');
 
   const [expenseSubmitting, setExpenseSubmitting] = useState(false);
+  const [deletingExpenseId, setDeletingExpenseId] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitInfo, setSubmitInfo] = useState('');
 
@@ -217,7 +231,14 @@ function App() {
         );
 
         clearPendingExpense();
-        setExpenseForm({ amount: '', category: '', description: '', date: getTodayDateString() });
+        setExpenseForm({
+          amount: '',
+          category: DEFAULT_EXPENSE_CATEGORIES[0],
+          description: '',
+          date: getTodayDateString(),
+        });
+        setCategoryInputType('preset');
+        setCustomCategory('');
         setSubmitInfo(response?.data?.info || 'Expense saved successfully.');
         await fetchExpenses();
       } catch (error) {
@@ -295,6 +316,18 @@ function App() {
     return Array.from(unique).sort((a, b) => a.localeCompare(b));
   }, [expenses]);
 
+  const formCategoryOptions = useMemo(() => {
+    const merged = new Set(DEFAULT_EXPENSE_CATEGORIES);
+
+    categories.forEach((category) => {
+      if (category) {
+        merged.add(category);
+      }
+    });
+
+    return Array.from(merged).sort((a, b) => a.localeCompare(b));
+  }, [categories]);
+
   const visibleExpenses = useMemo(() => {
     const filtered = expenses.filter((expense) => {
       if (categoryFilter === 'all') {
@@ -320,6 +353,20 @@ function App() {
 
   const visibleTotal = useMemo(() => {
     return visibleExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+  }, [visibleExpenses]);
+
+  const summaryByCategory = useMemo(() => {
+    const totals = new Map();
+
+    visibleExpenses.forEach((expense) => {
+      const key = expense.category || 'Uncategorized';
+      const value = Number(expense.amount || 0);
+      totals.set(key, (totals.get(key) || 0) + value);
+    });
+
+    return Array.from(totals.entries())
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
   }, [visibleExpenses]);
 
   const handleAuthSubmit = async (event) => {
@@ -362,6 +409,14 @@ function App() {
     setUser(null);
     setExpenses([]);
     setAuthForm({ name: '', email: '', password: '' });
+    setExpenseForm({
+      amount: '',
+      category: DEFAULT_EXPENSE_CATEGORIES[0],
+      description: '',
+      date: getTodayDateString(),
+    });
+    setCategoryInputType('preset');
+    setCustomCategory('');
     setSubmitError('');
     setSubmitInfo('');
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -374,7 +429,8 @@ function App() {
     setSubmitInfo('');
 
     const amount = Number(expenseForm.amount);
-    const category = expenseForm.category.trim();
+    const category =
+      categoryInputType === 'custom' ? customCategory.trim() : expenseForm.category.trim();
     const description = expenseForm.description.trim();
 
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -405,6 +461,41 @@ function App() {
       idempotencyKey: createIdempotencyKey(),
     });
   };
+
+  const handleDeleteExpense = useCallback(
+    async (expenseId) => {
+      if (!expenseId || !user?.token) {
+        return;
+      }
+
+      const shouldDelete = window.confirm('Delete this expense?');
+      if (!shouldDelete) {
+        return;
+      }
+
+      setDeletingExpenseId(expenseId);
+      setExpensesError('');
+      setSubmitInfo('');
+
+      try {
+        await requestWithRetry(
+          () =>
+            axios.delete(`${API_BASE_URL}/expenses/${expenseId}`, {
+              headers: authHeaders,
+              timeout: 10000,
+            }),
+          1,
+        );
+        setSubmitInfo('Expense deleted successfully.');
+        await fetchExpenses();
+      } catch (error) {
+        setExpensesError(getErrorMessage(error, 'Unable to delete expense.'));
+      } finally {
+        setDeletingExpenseId('');
+      }
+    },
+    [authHeaders, fetchExpenses, user?.token],
+  );
 
   return (
     <div className="page-shell">
@@ -520,16 +611,38 @@ function App() {
 
                 <label className="field">
                   <span>Category</span>
-                  <input
-                    type="text"
-                    value={expenseForm.category}
-                    onChange={(event) =>
-                      setExpenseForm((current) => ({ ...current, category: event.target.value }))
-                    }
-                    placeholder="e.g. Groceries"
-                    required
-                  />
+                  <select
+                    value={categoryInputType === 'custom' ? '__custom__' : expenseForm.category}
+                    onChange={(event) => {
+                      const selectedValue = event.target.value;
+                      if (selectedValue === '__custom__') {
+                        setCategoryInputType('custom');
+                      } else {
+                        setCategoryInputType('preset');
+                        setExpenseForm((current) => ({ ...current, category: selectedValue }));
+                      }
+                    }}
+                  >
+                    {formCategoryOptions.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                    <option value="__custom__">Custom category...</option>
+                  </select>
                 </label>
+                {categoryInputType === 'custom' ? (
+                  <label className="field">
+                    <span>Custom category</span>
+                    <input
+                      type="text"
+                      value={customCategory}
+                      onChange={(event) => setCustomCategory(event.target.value)}
+                      placeholder="Type your own category"
+                      required
+                    />
+                  </label>
+                ) : null}
 
                 <label className="field">
                   <span>Description</span>
@@ -612,6 +725,19 @@ function App() {
               {expensesError ? <p className="feedback error">{expensesError}</p> : null}
 
               <p className="total-line">Total: {formatCurrency(visibleTotal)}</p>
+              {summaryByCategory.length > 0 ? (
+                <div className="summary-box">
+                  <p className="summary-title">Summary by category</p>
+                  <div className="summary-items">
+                    {summaryByCategory.map((entry) => (
+                      <div className="summary-item" key={entry.category}>
+                        <span>{entry.category}</span>
+                        <strong>{formatCurrency(entry.total)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               {expensesLoading ? (
                 <p className="muted">Loading expenses...</p>
@@ -626,17 +752,36 @@ function App() {
                         <th>Category</th>
                         <th>Description</th>
                         <th className="amount">Amount</th>
+                        <th className="action-cell">Delete</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleExpenses.map((expense) => (
-                        <tr key={expense._id || expense.id || expense.idempotencyKey}>
-                          <td>{formatDate(expense.date)}</td>
-                          <td>{expense.category}</td>
-                          <td>{expense.description}</td>
-                          <td className="amount">{formatCurrency(Number(expense.amount || 0))}</td>
-                        </tr>
-                      ))}
+                      {visibleExpenses.map((expense) => {
+                        const expenseId = expense._id || expense.id;
+
+                        return (
+                          <tr key={expenseId || expense.idempotencyKey}>
+                            <td>{formatDate(expense.date)}</td>
+                            <td>{expense.category}</td>
+                            <td>{expense.description}</td>
+                            <td className="amount">{formatCurrency(Number(expense.amount || 0))}</td>
+                            <td className="action-cell">
+                              <button
+                                type="button"
+                                className="icon-button danger"
+                                aria-label="Delete expense"
+                                title="Delete expense"
+                                onClick={() => handleDeleteExpense(expenseId)}
+                                disabled={!expenseId || deletingExpenseId === expenseId}
+                              >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                  <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 7h2v8h-2v-8zm4 0h2v8h-2v-8zM7 10h2v8H7v-8z" />
+                                </svg>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

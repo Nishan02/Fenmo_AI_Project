@@ -269,6 +269,37 @@ select:focus {
   color: var(--ink-900);
 }
 
+.summary-box {
+  border: 1px solid #d8e8ee;
+  border-radius: 12px;
+  background: #f8fcfe;
+  padding: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+
+.summary-title {
+  margin: 0 0 0.4rem;
+  color: var(--ink-700);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.summary-items {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e5f0f4;
+  border-radius: 8px;
+  padding: 0.42rem 0.55rem;
+  color: var(--ink-700);
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid #d7e5ec;
@@ -301,6 +332,43 @@ tr:not(:last-child) td {
 .amount {
   text-align: right;
   white-space: nowrap;
+}
+
+.action-cell {
+  text-align: center;
+  width: 72px;
+}
+
+.icon-button {
+  border: 1px solid transparent;
+  background: #f2f8fb;
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.icon-button svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.icon-button.danger {
+  color: #b43d31;
+}
+
+.icon-button.danger:hover:not(:disabled) {
+  background: #feeceb;
+  border-color: #f3cbc7;
+}
+
+.icon-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 tbody tr {

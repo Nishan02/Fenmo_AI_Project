@@ -40,13 +40,17 @@ Expense model fields:
 
 Implemented:
 - Create expense with amount/category/description/date
+- Delete expense from list
 - View expense list
 - Filter by category
 - Sort by date (newest first default)
 - Show total for currently visible list (`INR`)
+- Summary view (total per category for current visible list)
 - Handles retries/refreshes/duplicate submits via idempotency keys
 - Loading and error states in UI
 - Basic validation (frontend + backend)
+- Default category options with custom category support
+- Automated tests for expense controller behaviors
 
 ## Reliability Behaviors
 - Frontend keeps pending expense submission in `localStorage` and retries safely.
@@ -92,7 +96,18 @@ npm run dev
 ## Notes (Design Decisions / Trade-offs / Not Done)
 - Money is stored as `Number` with 2-decimal normalization in controller for simplicity. In a stricter financial system, storing minor units (paise/cents as integers) would be safer.
 - Auth + user-scoped expenses were included to align with real-world usage.
-- No automated test suite was added yet due timeboxing.
+- Tests are focused on controller-level behavior using Node's built-in `node:test` to keep setup light.
 - No edit/delete expense endpoints were added because they were out of assignment scope.
 - Deploy links are not included in this repo yet; add them after deployment.
 
+## Automated Tests
+Run backend tests:
+```bash
+cd backend
+npm test
+```
+
+Current tests cover:
+- validation for invalid amount
+- idempotent create behavior (same key returns existing row)
+- list filter/sort behavior and total calculation
