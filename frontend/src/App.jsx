@@ -354,6 +354,7 @@ function App() {
   const visibleTotal = useMemo(() => {
     return visibleExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
   }, [visibleExpenses]);
+  const isListCustomized = categoryFilter !== 'all' || sortOrder !== 'date_desc';
 
   const summaryByCategory = useMemo(() => {
     const totals = new Map();
@@ -478,7 +479,7 @@ function App() {
       setSubmitInfo('');
 
       try {
-        await requestWithRetry(
+        const response = await requestWithRetry(
           () =>
             axios.delete(`${API_BASE_URL}/expenses/${expenseId}`, {
               headers: authHeaders,
@@ -486,9 +487,24 @@ function App() {
             }),
           1,
         );
+
+        if (response?.status !== 200 || response?.data?.success !== true) {
+          throw new Error('Delete was not confirmed by server.');
+        }
+
+        setExpenses((current) =>
+          current.filter((expense) => (expense._id || expense.id) !== expenseId),
+        );
         setSubmitInfo('Expense deleted successfully.');
         await fetchExpenses();
       } catch (error) {
+        if (error?.response?.status === 404) {
+          setExpensesError(
+            'Delete failed (404). Expense was not found on server. Refreshing list.',
+          );
+          await fetchExpenses();
+          return;
+        }
         setExpensesError(getErrorMessage(error, 'Unable to delete expense.'));
       } finally {
         setDeletingExpenseId('');
@@ -497,30 +513,47 @@ function App() {
     [authHeaders, fetchExpenses, user?.token],
   );
 
+  useEffect(() => {
+    if (!submitInfo) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setSubmitInfo('');
+    }, 3200);
+
+    return () => clearTimeout(timer);
+  }, [submitInfo]);
+
   return (
-    <div className="page-shell">
+    <div className={`page-shell ${!user ? 'guest-mode' : ''}`}>
       <div className="background-glow background-glow-left" aria-hidden="true" />
       <div className="background-glow background-glow-right" aria-hidden="true" />
 
-      <main className="app-container">
-        <header className="app-header">
-          <div>
-            <p className="eyebrow">Personal Finance Tool</p>
-            <h1>Expense Tracker</h1>
-          </div>
+      <main className={`app-container ${!user ? 'auth-layout' : ''}`}>
+        {user ? (
+          <header className="app-header">
+            <div>
+              <p className="eyebrow">Personal Finance Tool</p>
+              <h1>Expense Tracker</h1>
+            </div>
 
-          {user ? (
             <div className="user-actions">
               <span className="welcome-label">{user.name}</span>
               <button type="button" className="button secondary" onClick={handleLogout}>
                 Logout
               </button>
             </div>
-          ) : null}
-        </header>
+          </header>
+        ) : null}
 
         {!user ? (
           <section className="panel auth-panel">
+            <div className="auth-brand">
+              <p className="eyebrow">Personal Finance Tool</p>
+              <h1>Expense Tracker</h1>
+              <p className="auth-subtitle">Log in or sign up to start tracking your spending.</p>
+            </div>
             <div className="tabs" role="tablist" aria-label="Authentication">
               <button
                 type="button"
@@ -719,12 +752,36 @@ function App() {
                       <option value="date_asc">Oldest first</option>
                     </select>
                   </label>
+
+                  {isListCustomized ? (
+                    <button
+                      type="button"
+                      className="button ghost compact-action"
+                      onClick={() => {
+                        setCategoryFilter('all');
+                        setSortOrder('date_desc');
+                      }}
+                    >
+                      Reset
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
               {expensesError ? <p className="feedback error">{expensesError}</p> : null}
 
-              <p className="total-line">Total: {formatCurrency(visibleTotal)}</p>
+              <div className="total-card" aria-live="polite">
+                <div>
+                  <p className="total-label">Visible Total</p>
+                  <p className="total-amount">{formatCurrency(visibleTotal)}</p>
+                </div>
+                <div className="total-meta">
+                  <span className="meta-chip">{visibleExpenses.length} item(s)</span>
+                  <span className="meta-chip">
+                    {categoryFilter === 'all' ? 'All categories' : categoryFilter}
+                  </span>
+                </div>
+              </div>
               {summaryByCategory.length > 0 ? (
                 <div className="summary-box">
                   <p className="summary-title">Summary by category</p>
@@ -740,9 +797,27 @@ function App() {
               ) : null}
 
               {expensesLoading ? (
-                <p className="muted">Loading expenses...</p>
+                <div className="loading-state" aria-live="polite">
+                  <div className="skeleton-row" />
+                  <div className="skeleton-row" />
+                  <div className="skeleton-row" />
+                </div>
               ) : visibleExpenses.length === 0 ? (
-                <p className="muted">No expenses found for the selected filters.</p>
+                <div className="empty-state">
+                  <p className="muted">No expenses found for the selected filters.</p>
+                  {isListCustomized ? (
+                    <button
+                      type="button"
+                      className="button secondary compact-action"
+                      onClick={() => {
+                        setCategoryFilter('all');
+                        setSortOrder('date_desc');
+                      }}
+                    >
+                      Show all expenses
+                    </button>
+                  ) : null}
+                </div>
               ) : (
                 <div className="table-wrap">
                   <table>
