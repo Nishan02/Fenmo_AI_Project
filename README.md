@@ -54,7 +54,6 @@ Implemented:
 - Basic validation (frontend + backend)
 - Default category options with custom category support
 - Automated tests for expense controller behaviors
-- Improved UX: centered auth layout, highlighted total card, reset filters, loading skeletons, better empty state
 
 ## Reliability Behaviors
 - Frontend keeps pending expense submission in `localStorage` and retries safely.
