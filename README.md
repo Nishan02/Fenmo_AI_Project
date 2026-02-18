@@ -1,55 +1,98 @@
-# 🌿 Expense Tracker Application
-Expense Tracker is a production-minded, full-stack expense tracking application built to help users record and review personal expenses with clarity and reliability. Designed for real-world conditions (network retries, refreshes, duplicate submissions), it ensures accurate data handling while keeping the feature set intentionally focused and maintainable.
-## 🚀 Features
-- User authentication and authorization
-- Expense tracking with categories
-- Sorting and filtering of expenses
-- Responsive frontend design
-- RESTful API for backend services
-## 🛠️ Technologies Used
-- Node.js
-- Express.js
-- React.js
-- MongoDB
-- Mongoose
-- JSON Web Tokens (JWT)
-- dotenv
-- cors
-- axios
-## 🛠️ Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/expense-tracker.git
-   ```
-2. Navigate to the project directory:
-   ```bash
-   cd expense-tracker
-   ```
-3. Install dependencies for both backend and frontend:
-   ```bash
-   # Install backend dependencies
-   cd backend
-   npm install
+# Expense Tracker (Full Stack)
 
-   # Install frontend dependencies
-   cd ../frontend
-   npm install
-   ```
-4. Set up environment variables:
-   - Create a `.env` file in the backend directory.
-   - Add the following environment variables:
-     ```
-     PORT=3000
-     MONGODB_URI=your_mongodb_connection_string
-     JWT_SECRET=your_jwt_secret
-     ```
-5. Run the application:
-   ```bash
-   # Start the backend server
-   cd backend
-   npm start
+A minimal production-minded personal expense tracker with:
+- JWT auth (`signup`, `login`)
+- Idempotent expense creation for retry safety
+- Expense listing with category filter and date sort
+- Total for currently visible expenses in the UI
 
-   # Start the frontend development server
-   cd ../frontend
-   npm start
-   ```
+## Tech Stack
+- Backend: Node.js, Express, MongoDB, Mongoose, JWT
+- Frontend: React + Vite, Axios
+
+## Why MongoDB
+MongoDB with Mongoose was chosen for speed of implementation and schema validation while still using real persistence (not in-memory). It is sufficient for this scope and easy to evolve.
+
+## Core API
+
+### Auth
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+
+### Expenses (protected with Bearer token)
+- `POST /api/expenses`
+  - Body: `amount`, `category`, `description`, `date`, `idempotencyKey`
+  - Idempotent behavior: same `idempotencyKey` for same user returns the already-created expense.
+- `GET /api/expenses`
+  - Optional query params:
+  - `category=<string>`
+  - `sort=date_desc` (default), also supports `date_asc`
+
+Expense model fields:
+- `id` (`_id`)
+- `amount`
+- `category`
+- `description`
+- `date`
+- `created_at`
+
+## Assignment Coverage
+
+Implemented:
+- Create expense with amount/category/description/date
+- View expense list
+- Filter by category
+- Sort by date (newest first default)
+- Show total for currently visible list (`INR`)
+- Handles retries/refreshes/duplicate submits via idempotency keys
+- Loading and error states in UI
+- Basic validation (frontend + backend)
+
+## Reliability Behaviors
+- Frontend keeps pending expense submission in `localStorage` and retries safely.
+- Backend enforces idempotency per user with unique compound index:
+  - `{ user, idempotencyKey }`
+
+## Run Locally
+
+## 1) Backend
+```bash
+cd backend
+npm install
+```
+
+Create `backend/.env`:
+```env
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+PORT=5000
+```
+
+Start backend:
+```bash
+npm run dev
+```
+
+## 2) Frontend
+```bash
+cd frontend
+npm install
+```
+
+Optional frontend env (`frontend/.env`):
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
+```
+
+Start frontend:
+```bash
+npm run dev
+```
+
+## Notes (Design Decisions / Trade-offs / Not Done)
+- Money is stored as `Number` with 2-decimal normalization in controller for simplicity. In a stricter financial system, storing minor units (paise/cents as integers) would be safer.
+- Auth + user-scoped expenses were included to align with real-world usage.
+- No automated test suite was added yet due timeboxing.
+- No edit/delete expense endpoints were added because they were out of assignment scope.
+- Deploy links are not included in this repo yet; add them after deployment.
+

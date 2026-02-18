@@ -5,7 +5,7 @@ const Expense = require('../models/Expense');
 exports.getExpenses = async (req, res) => {
   try {
     const { category, sort } = req.query;
-    let query = {};
+    const query = { user: req.user._id };
 
     if (category) {
       query.category = category;
@@ -13,12 +13,16 @@ exports.getExpenses = async (req, res) => {
 
     // Default sort: newest first (date_desc)
     let sortOption = { date: -1 };
-    
-    //const expenses = await Expense.find(query).sort(sortOption);
-    const expenses = await Expense.find({ user: req.user._id }).sort(sortOption); // Filter by user
+    if (sort === 'date_asc') {
+      sortOption = { date: 1 };
+    }
+
+    const expenses = await Expense.find(query).sort(sortOption);
+    const totalAmount = expenses.reduce((acc, curr) => acc + curr.amount, 0);
 
     res.status(200).json({
       success: true,
+      total: totalAmount,
       count: expenses.length,
       data: expenses
     });
@@ -32,41 +36,76 @@ exports.getExpenses = async (req, res) => {
 exports.createExpense = async (req, res) => {
   try {
     const { amount, category, description, date, idempotencyKey } = req.body;
+    const parsedAmount = Number(amount);
+    const parsedDate = new Date(date);
+    const cleanCategory = String(category || '').trim();
+    const cleanDescription = String(description || '').trim();
+    const cleanIdempotencyKey = String(idempotencyKey || '').trim();
 
-    // 1. Check if idempotencyKey exists
-    if (!idempotencyKey) {
-      return res.status(400).json({ success: false, error: 'Idempotency Key missing' });
+    if (!cleanIdempotencyKey) {
+      return res.status(400).json({ success: false, error: 'Idempotency key is required' });
     }
 
-    // 2. Try to create the record
-    const expense = await Expense.create({
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return res.status(400).json({ success: false, error: 'Amount must be a positive number' });
+    }
+
+    if (!cleanCategory) {
+      return res.status(400).json({ success: false, error: 'Category is required' });
+    }
+
+    if (!cleanDescription) {
+      return res.status(400).json({ success: false, error: 'Description is required' });
+    }
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ success: false, error: 'A valid date is required' });
+    }
+
+    // Return existing row if this idempotency key was already used by this user.
+    const existingExpense = await Expense.findOne({
       user: req.user._id,
-      amount,
-      category,
-      description,
-      date,
-      idempotencyKey
+      idempotencyKey: cleanIdempotencyKey,
     });
-
-    res.status(201).json({ success: true, data: expense });
-
-  } catch (error) {
-    // 3. Handle Duplicate Key Error (The Retry Case)
-    if (error.code === 11000) {
-      const existingExpense = await Expense.findOne({ idempotencyKey: req.body.idempotencyKey });
-      return res.status(200).json({ 
-        success: true, 
-        data: existingExpense, 
-        info: 'Retrieved existing entry (Idempotent)' 
+    if (existingExpense) {
+      return res.status(200).json({
+        success: true,
+        data: existingExpense,
+        info: 'Retrieved existing entry (Idempotent)',
       });
     }
 
-    // 4. Handle Validation Errors
+    const expense = await Expense.create({
+      user: req.user._id,
+      amount: Number(parsedAmount.toFixed(2)),
+      category: cleanCategory,
+      description: cleanDescription,
+      date: parsedDate,
+      idempotencyKey: cleanIdempotencyKey,
+    });
+
+    res.status(201).json({ success: true, data: expense });
+  } catch (error) {
+    // Duplicate key can still happen under concurrent retries.
+    if (error.code === 11000) {
+      const existingExpense = await Expense.findOne({
+        user: req.user._id,
+        idempotencyKey: String(req.body.idempotencyKey || '').trim(),
+      });
+      if (existingExpense) {
+        return res.status(200).json({
+          success: true,
+          data: existingExpense,
+          info: 'Retrieved existing entry (Idempotent)',
+        });
+      }
+    }
+
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(val => val.message);
+      const messages = Object.values(error.errors).map((val) => val.message);
       return res.status(400).json({ success: false, error: messages });
     }
 
-    res.status(500).json({ success: false, error: 'Server Error' });
+    return res.status(500).json({ success: false, error: 'Server Error' });
   }
 };
