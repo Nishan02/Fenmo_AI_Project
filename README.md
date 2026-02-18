@@ -89,12 +89,24 @@ npm install
 
 Optional frontend env (`frontend/.env`):
 ```env
-VITE_API_BASE_URL=http://localhost:5000/api
+VITE_API_URL=http://localhost:5000/api
 ```
 
 Start frontend:
 ```bash
 npm run dev
+```
+
+## Deployment Config
+The frontend reads API base URL from:
+- `VITE_API_URL`
+
+Fallback if not set:
+- `http://localhost:5000/api`
+
+Example production value:
+```env
+VITE_API_URL=https://your-backend-domain.com/api
 ```
 
 ## Notes (Design Decisions / Trade-offs / Not Done)

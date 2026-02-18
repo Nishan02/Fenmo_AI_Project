@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
 const AUTH_STORAGE_KEY = 'expense_tracker_auth';
 const PENDING_EXPENSE_KEY = 'expense_tracker_pending_expense';
 const DEFAULT_EXPENSE_CATEGORIES = [
@@ -25,7 +25,7 @@ const getTodayDateString = () => {
 
 const getErrorMessage = (error, fallbackMessage) => {
   if (error?.code === 'ERR_NETWORK') {
-    return 'Cannot reach API server. Start backend on http://localhost:5000.';
+    return `Cannot reach API server (${API_URL}). Check VITE_API_URL and backend status.`;
   }
 
   const apiError = error?.response?.data?.error;
@@ -189,7 +189,7 @@ function App() {
     try {
       const response = await requestWithRetry(
         () =>
-          axios.get(`${API_BASE_URL}/expenses`, {
+          axios.get(`${API_URL}/expenses`, {
             headers: authHeaders,
             params: { sort: 'date_desc' },
             timeout: 10000,
@@ -223,7 +223,7 @@ function App() {
       try {
         const response = await requestWithRetry(
           () =>
-            axios.post(`${API_BASE_URL}/expenses`, payload, {
+            axios.post(`${API_URL}/expenses`, payload, {
               headers: authHeaders,
               timeout: 10000,
             }),
@@ -390,7 +390,7 @@ function App() {
 
       const response = await requestWithRetry(
         () =>
-          axios.post(`${API_BASE_URL}/auth/${endpoint}`, payload, {
+          axios.post(`${API_URL}/auth/${endpoint}`, payload, {
             timeout: 10000,
           }),
         1,
@@ -481,7 +481,7 @@ function App() {
       try {
         const response = await requestWithRetry(
           () =>
-            axios.delete(`${API_BASE_URL}/expenses/${expenseId}`, {
+            axios.delete(`${API_URL}/expenses/${expenseId}`, {
               headers: authHeaders,
               timeout: 10000,
             }),
