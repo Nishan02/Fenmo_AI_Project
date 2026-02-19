@@ -113,7 +113,6 @@ VITE_API_URL=https://your-backend-domain.com/api
 - Auth + user-scoped expenses were included to align with real-world usage.
 - Tests are focused on controller-level behavior using Node's built-in `node:test` to keep setup light.
 - Delete is implemented; update/edit endpoints were intentionally not added to keep scope focused.
-- Deploy links are not included in this repo yet; add them after deployment.
 
 ## Automated Tests
 Run backend tests:
